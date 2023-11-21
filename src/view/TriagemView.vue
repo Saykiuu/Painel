@@ -1,8 +1,7 @@
 <script>
 import axios from "axios";
-import {state } from '@/socket'
-import socket from './../socket';
 import LoadingView from '@/components/LoadingView.vue';
+import { io } from "socket.io-client";
 
 export default {
     components:{
@@ -18,19 +17,55 @@ export default {
                 tipo:''
             },
             senhaServiços: [],
-            controleSenhas: [],
+            senhas: {
+                senhasAtendidas:[],
+                senhasChamadas: [],
+                senhasEsperando: []
+            },
+            controleSenhas:[],
+
 
             listServicos: [{
                 id: 0,
                 description: ''
             }],
-            socketInstance: state,
-            count:[],
-            load: false
+            socketInstance: [],
+            load: false,
+            printSenha : {
+                data: '',
+                hora: '',
+                senha: '',
+                tipo: '',
+            },
+            mensagem : ''
         }
         
     },
     methods:{
+
+        async connectar(){
+            this.socketInstance = io('http://192.168.102.168:3000');
+            await this.socketInstance.on('listar senhas', (data)=>{
+                this.senhas = data;
+                this.countSenhasService();
+                this.load = false;
+            })
+           
+        },
+
+        async getConfigs(){
+                try {
+                    let con = await axios.get("http://192.168.102.168:3000/consulta/configs");
+                    if(con.status == 200){
+                        this.mensagem = con.data[0].mensagem
+                    }
+                } catch (error) {
+                    if(error.response?.status == 401){
+                        sessionStorage.clear()
+                        this.$router.push('/login')
+                    }
+                }
+            },
 
         async getServico(){
             try {
@@ -39,6 +74,7 @@ export default {
                 this.listServicos = [];
                 if(con.status == 200){
                     this.listServicos = con.data
+                    this.countSenhasService();
                 }
             } catch (error) {
                 console.log(error)
@@ -66,60 +102,78 @@ export default {
                 this.logout()
             }
 
-            this.senhaServiços = state.senhas
         },
 
-        countSenhasService(i){
-                let senhas = state.senhasAtendidas.concat(state.senhasChamadas, state.senhasEsperando)
-                this.count= []
+        countSenhasService(){
+            if(this.senhas != undefined){
+                this.controleSenhas.length = 0;
+                console.log(this.controleSenhas)
+                let pass = this.senhas.senhasAtendidas.concat(this.senhas.senhasChamadas, this.senhas.senhasEsperando)
                 for (let k = 0; k < this.listServicos.length; k++) {
                     const servico = this.listServicos[k];
                     let y = [];
-                    for (let o = 0; o < senhas.length; o++) {
-                        const senha = senhas[o];
+                    for (let o = 0; o < pass.length; o++) {
+                        const senha = pass[o];
                         if(senha.servico.toUpperCase() == servico.description.toUpperCase()){
                             y.push(senha)
                         }
                     }
-                    this.count.push(y)
+                    let normal = y.filter(cont => cont.tipo == 'normal');
+                    let prioridade = y.filter(cont => cont.tipo == 'prioridade');
+    
+                    this.controleSenhas.push({normal: normal.length, prioridade: prioridade.length});
+                   
                 }
-
-                let normal = this.count[i].filter(cont => cont.tipo == 'normal')
                 
-                let prioridade = this.count[i].filter(cont => cont.tipo == 'prioridade')
-               
-                return `${ normal.length} / ${prioridade.length}` 
+            }
         },
 
-        criarSenha( servico, tipo, index){
+        async criarSenha( servico, tipo, index){
             let alfabeto = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","U","V","W","X","Y","Z"];
-            
-            let cont = this.count[index].filter(cont => cont.tipo == 'normal').length + 1
-            let numero = `${alfabeto[this.listServicos.findIndex((e)=>e.description === servico)]}${tipo.substring(0, 1).toUpperCase()}${cont}` 
-            let data= new Date()
+            let cont = this.controleSenhas[index][tipo] + 1
+            let data = new Date();
+            this.printSenha = {
+                data: data.toLocaleDateString(),
+                hora: data.toLocaleTimeString(),
+                senha : `${alfabeto[this.listServicos.findIndex((e)=>e.description === servico)]}${tipo.substring(0, 1).toUpperCase()}${cont}`,
+                tipo: tipo,
+            }
             let jsn = {
                 servico: servico,
                 tipo: tipo,
-                senha: numero,
+                senha: this.printSenha.senha,
                 status: "esperando",
-                data: data.toLocaleDateString(),
-                hora: data.toLocaleTimeString(),
+                data: this.printSenha.data,
+                hora: this.printSenha.hora,
                 guiche: ''
             }
             
-            socket.sentData(jsn)
+            this.socketInstance.emit('criar senha', jsn);
+            this.load = true;
+            await new Promise(()=>{
+                setTimeout(() => {
+                    print()
+                }, 1000);
+            })
         },
-
-        loading(){
-            this.load = state.loadtria
-            return this.load
-        }
        
     },
-    created(){
+    beforeUnmount (){
+        this.socketInstance.disconnect()
+    },
+    beforeMount(){
+        this.connectar();
         this.getServico();
+        this.getConfigs();
         this.getInfos();
     }
+    // ,
+    // watch: {
+    //     controleSenhas(newValue, oldValue){
+    //         console.log(newValue, oldValue)
+    //         console.log('será');
+    //     }
+    // }
 }
 </script>
 
@@ -135,13 +189,13 @@ export default {
             </div>
         </div>
     </nav>
-    <section >
+    <section class="content-card" >
             <div class="cards" v-for="(item, index) in listServicos" :key="index" >
                 <div class="cards-header">
                     <div class="title">{{ item.description }}</div>
                     
                     <div class="senha">
-                        Senhas  {{ countSenhasService(index) }}
+                        Senhas  {{ controleSenhas[index]?.normal }} / {{ controleSenhas[index]?.prioridade }}
                     </div>
 
                 </div>
@@ -151,18 +205,75 @@ export default {
                     <div class="space"></div>
                     <button class="btn" v-on:click="criarSenha(item.description,'prioridade', index)">Prioridade</button>
                 </div>
+
+                
             </div>
+        <LoadingView v-if="load"></LoadingView>
+            
     </section>
-    <LoadingView v-if="loading()"></LoadingView>
+
+    <div id="showPrint">
+        <div class="content-print">
+            <span class="pass">{{ printSenha.senha }}</span>
+            <span class="type">{{ printSenha.tipo }}</span>
+            <span class="date">{{ printSenha.data }} - {{ printSenha.hora }}</span>
+            <span class="message">{{ mensagem }}</span>
+
+        </div>
+    </div>
+    
 </template>
 
 <style scoped>
     
-   
+    @media print{
+        nav{
+            display: none;
+        }
+
+        .content-card{
+            display: none;
+        }
+
+        #showPrint{
+            display: block !important;
+        }
+    }
+    #showPrint{
+        display: none;
+    }
+    .message{
+        width: 80%;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .content-print{
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        bottom: 0;
+        display: flex;
+        justify-content: start;
+        margin: 30px;
+        align-items: center;
+        flex-direction: column;
+    }
+    .pass{
+        font-size: 40px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    .type{
+        font-size: 25px;
+        text-transform: capitalize;
+    }
+    
     .cards-body{
         align-items: center;
         display: flex;
     }
+    
 
     section{
         display: grid;

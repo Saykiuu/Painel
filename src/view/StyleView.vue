@@ -1,28 +1,19 @@
 <script>
 
 import ModalAdd from '@/components/ModalAdd.vue';
+import AlertView from '@/components/AlertView.vue';
 import axios from 'axios'
 
 export default {
     components: {
-        ModalAdd
+        ModalAdd,
+        AlertView
     },
     data(){
         return {
-            listasSons: [
-                { son: "aeroporto", path: "@/assets/alert/airport-bingbong.wav"},
-                { son: "ding dong", path: "@/assets/alert/ding-dong.wav"},
-                { son: "ding dong 2", path: "@/assets/alert/ding-dong.wav"},
-                { son: "sino de porta", path: "@/assets/alert/bingbong.wav"},
-                { son: "sino de porta2", path: "@/assets/alert/toydorrbell.wav"},
-                { son: "notificação", path: "@/assets/alert/infobleep.wav"},
-                { son: "pin", path: "@/assets/alert/quito-mariscal-sucre.wav"},
-            ],
-            sons:  { som: "aeroporto", path: "@/assets/alert/airport-bingbong.wav"},
-            selectSom: '',
-
             tipo: "video",
             selectedTipo: "video",
+            alerts: [],
 
             conteudo: "",
             newConteudo: "",
@@ -33,7 +24,6 @@ export default {
             optEdit: "",
             
             isvisible: false
-
         }
     },
     
@@ -57,13 +47,12 @@ export default {
                         this.newMensagem = element.mensagem,
                         this.tipo = element.tipo_conteudo,
                         this.conteudo = element.conteudo,
-                        this.sons =  this.listasSons.filter(e=>{if(e.path == element.son) return e})[0]
                         this.newConteudo = element.conteudo
                         this.selectedTipo = element.tipo_conteudo
                     });
                 }
             } catch (error) {
-                if(error.response.status == 401){
+                if(error.response2.status == 401){
                     sessionStorage.clear()
                     this.$router.push('/login')
                 }
@@ -95,8 +84,14 @@ export default {
                 if(con.status == 200){
                     this.getConfigs();    
                     this.closeModal()
+                    this.alerts.push({
+                        message: con.data.message, 
+                        tipo: true,
+                        title:"Sucesso!"
+                    })     
                 }
             } catch (error) {
+                
                 console.log(error)
                 if(error.response?.status == 401){
                     localStorage.clear()
@@ -120,16 +115,10 @@ export default {
 </script>
 
 <template>
+    <AlertView v-for="(item, index) in alerts" :key="index" :alert="item"></AlertView>
     <section>
         <div class="content-cards">
-            <div class="cards" v-on:click="showModal('som')">
-                <div class="header-cards">
-                    som
-                </div>
-                <div class="body-cards">
-                   {{ sons.son }}
-                </div>
-            </div>
+            
             <div class="cards"  v-on:click="showModal('conteúdo')">
                 <div class="header-cards" >
                     Conteúdo

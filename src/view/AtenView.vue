@@ -1,7 +1,7 @@
 <script>
-import { state } from '@/socket';
-import socket from './../socket';
 import LoadingView from '@/components/LoadingView.vue';
+import { io } from "socket.io-client";
+
 
 export default {
     data(){
@@ -13,7 +13,7 @@ export default {
                 servico: '',
                 tipo: ''
             },
-            selectedSenha: undefined,
+            selectedSenha : [],
             listSenhasEspera:[{
                 servico: "",
                 tipo: "",
@@ -31,7 +31,8 @@ export default {
                 hora: "",
             }],
 
-            laod: false
+            load: false,
+            socketInstance: undefined
         }
     },
     methods: {
@@ -57,58 +58,50 @@ export default {
             localStorage.clear()
         },
 
-        getListaSenhas(){
-            const t = state.senhasEsperando.filter(senha=> senha.servico == this.profile.servico)
-            return t;
-        },
-
-        getListaHistorico(){
-            const t = state.senhasAtendidas.filter(senha=> senha.servico == this.profile.servico)
-            return t.reverse()
-        },
-
         captalize(val){
             return `${val.charAt(0).toUpperCase()}${val.slice(1)}`
         },
+
         selecionarSenha(item){
+            this.load = true;
             item.guiche = this.profile.guiche
-            socket.chamarSenha(item)
-            this.getSenha()
+            this.socketInstance.emit('chamar senha', item)
         },
 
         chamarNovamente(){
-            socket.chamarNovamente(this.selectedSenha)
-        },
-
-        getSenha(){
-            let t = state.senhasChamadas.filter(e=>{if(e.servico == this.profile.servico && e.guiche == this.profile.guiche ) return e})
-            if(t.length == 0){
-                t = [undefined]
-            }
-            this.selectedSenha = t[0];
-            return this.selectedSenha;
-        },
-
-        loading(){
-            this.load = state.loadAten
-            return this.load
-        },
-        finalizarAtendimento(){
-            socket.finalizarAtendimento(this.selectedSenha)
-            this.selectedSenha = undefined;
-
-        },
-
-        voltarSenha(){
-            socket.voltarSenha(this.selectedSenha);
-            this.selectedSenha = undefined;
+            this.socketInstance.emit('chamar novamente',  this.selectedSenha[0])
         },
 
        
+        finalizarAtendimento(){
+            this.socketInstance.emit('finalizar atendimento', this.selectedSenha[0])
+            this.load = true
+        },
+
+        voltarSenha(){
+            this.load = true
+            this.socketInstance.emit('voltar senha', this.selectedSenha[0])
+        },
+
+        connectar(){
+            this.socketInstance = io('http://192.168.102.168:3000')
+            this.socketInstance.on('listar senhas', (data)=>{
+                this.listSenhasEspera = [];
+                this.listSenhasHistorico = [];
+                this.listSenhasEspera = data.senhasEsperando.filter(senha=> senha.servico == this.profile.servico)
+                this.listSenhasHistorico = data.senhasAtendidas.filter(senha=> senha.servico == this.profile.servico)
+                this.selectedSenha = data.senhasChamadas.filter(e=>{if(e.servico == this.profile.servico && e.guiche == this.profile.guiche ) return e})
+                this.load = false;
+            })
+        }
     },  
 
     created(){
         this.getInfos()
+        this.connectar();
+    },
+    beforeUnmount (){
+        this.socketInstance.disconnect()
     },
     components: {
         LoadingView
@@ -131,12 +124,12 @@ export default {
     <div class="content-sections">
         <section class="content-list">
             <ul class="list">
-                <li class="item-list" v-for="(item, index) in getListaSenhas()" :key="index" >
+                <li class="item-list" v-for="(item, index) in listSenhasEspera" :key="index" >
                     <div >
                         <p> {{ item.senha }} - {{ captalize(item.tipo) }}</p>
                         <p> {{ formatHora(item.hora) }}</p>
                     </div>
-                    <button class="btn btn-icon" v-on:click="selecionarSenha(item)" v-if="!this.selectedSenha">
+                    <button class="btn btn-icon" v-on:click="selecionarSenha(item)" v-if="this.selectedSenha.length == 0">
                         <span class="material-icons">
                             campaign
                         </span>
@@ -146,25 +139,25 @@ export default {
         </section> 
         <section class="atual">
             <div class="conteudo"  >
-                <span class="senha-pass" v-if="getSenha() != undefined">
-                    {{ getSenha().senha }} <br>
-                    {{ getSenha().tipo }}
+                <span class="senha-pass" v-if="selectedSenha.length != 0">
+                    {{ selectedSenha[0].senha }} <br>
+                    {{ selectedSenha[0].tipo }}
                 </span>
                 <span class="senha-pass"  v-else>
                     Nenhuma senha foi chamada
                 </span>
                 <div class="list-actions">
-                    <button class="btn btn-yellow" :disabled="selectedSenha == undefined" v-on:click="chamarNovamente">Chamar Novamente</button>
+                    <button class="btn btn-yellow" :disabled="selectedSenha.length == 0" v-on:click="chamarNovamente">Chamar Novamente</button>
                     <div class="space"></div>
-                    <button class="btn btn-main" :disabled="selectedSenha == undefined" v-on:click="finalizarAtendimento">Finalizar Atendimento</button>
+                    <button class="btn btn-main" :disabled="selectedSenha.length== 0" v-on:click="finalizarAtendimento">Finalizar Atendimento</button>
                     <div class="space"></div>
-                    <button class="btn btn-red" :disabled="selectedSenha == undefined"  v-on:click="voltarSenha">Voltar para espera</button>
+                    <button class="btn btn-red" :disabled="selectedSenha.length== 0"  v-on:click="voltarSenha">Voltar para espera</button>
                 </div>
             </div>
         </section>      
         <section class="container-historico">
             <ul class="list" >
-                <li class="itens" v-for="(item, index) in getListaHistorico()" :key="index">
+                <li class="itens" v-for="(item, index) in listSenhasHistorico.reverse()" :key="index">
                     <span>{{ item?.senha }}</span>
                     <span>{{ item?.status }}</span>
                     <span>{{ formatHora(item?.hora) }} - {{ captalize(item?.tipo) }}</span>
@@ -173,7 +166,7 @@ export default {
         </section> 
     </div>
     
-    <LoadingView v-if="loading()"></LoadingView>
+    <LoadingView v-if="load"></LoadingView>
 </template>
 
 <style scoped>
@@ -205,8 +198,10 @@ export default {
         right: 0;
         bottom: 0;
         left: 300px;
-        height: 70px;
+        height: 100px;
         background-color: #fff;
+        overflow-x: auto;
+        overflow-y: hidden;
     }
 
     .container-historico .list  {

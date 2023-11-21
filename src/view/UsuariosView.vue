@@ -2,10 +2,11 @@
 import axios from 'axios';
 import ModalAdd from '@/components/ModalAdd.vue';
 import ModalEdit from '@/components/ModalEdit.vue';
-
+import LoadingView from '@/components/LoadingView.vue';
+import AlertView from '@/components/AlertView.vue';
 
 export default {
-    
+   
     data(){
         return {
             isModalVisible: false,
@@ -30,7 +31,6 @@ export default {
                 guiche: '',
                 s_id: 0,
                 s_nome: ''
-
             },
 
             listUsuarios: [{
@@ -47,20 +47,30 @@ export default {
                 id: 0,
                 description: '',
                 status: false
-            }]
+            }],
+
+            alerts: [],
+            loading:false
         }
     },
     methods: {
         async getUsuarios(){
             try {
                 let usuario = localStorage.getItem('token');
+                this.loading = true
                 let con = await axios.get("http://192.168.102.168:3000/consulta/usuario", { headers: { Authorization: usuario }});
                 this.listUsuarios= [];
                 if(con.status == 200){
                     this.listUsuarios = con.data
                 }
-
+                this.loading = false
             } catch (error) {
+                this.loading = false
+                this.alerts.push({
+                    message: "Erro na consulta de usuarios", 
+                    tipo: false,
+                    title:"Erro!"
+                })
                 if(error.response.status == 401){
                     sessionStorage.clear()
                     this.$router.push('/login')
@@ -105,14 +115,27 @@ export default {
 
         async cadastrarUsuario(){
             try {
+                this.loading = true
                 let usuario = localStorage.getItem('token');
                 let con = await axios.post("http://192.168.102.168:3000/cadastrar/usuario", this.usuario , { headers: { Authorization: usuario }});
                 if(con.status == 200){
                     this.getUsuarios()        
-                    this.closeModal()        
+                    this.closeModal()   
+                    this.alerts.push({
+                        message: con.data.message, 
+                        tipo: true,
+                        title:"Sucesso!"
+                    })     
                 }
+                this.loading = false
+                
             } catch (error) {
-                console.log(error)
+                this.loading = false
+                this.alerts.push({
+                    message: error.response.data.message, 
+                    tipo: false,
+                    title:"Erro!"
+                })  
                 if(error.response?.status == 401){
                     sessionStorage.clear()
                     this.$router.push('/login')
@@ -122,13 +145,28 @@ export default {
 
         async editarUsuario(){
            try {
+                this.loading = true
                 let usuario = localStorage.getItem('token');
                 let con = await axios.post("http://192.168.102.168:3000/atualizar/usuario", this.editUsuario , { headers: { Authorization: usuario }});
                 if(con.status == 200){
-                    this.closeModalEdit()        
+                    this.closeModalEdit()    
+                    this.getUsuarios()    
+                    this.alerts.push({
+
+                        message: con.data.message, 
+                        tipo: true,
+                        title:"Sucesso!"
+                    })
                 }
+               
+                this.loading = false
             } catch (error) {
-                console.log(error)
+                this.alerts.push({
+                    message: error.response.data.message, 
+                    tipo: false,
+                    title:"Erro!"
+                }) 
+                this.loading = false
                 if(error.response?.status == 401){
                     sessionStorage.clear()
                     this.$router.push('/login')
@@ -138,13 +176,18 @@ export default {
 
         async getServico(){
             try {
+                this.loading = true
                 let usuario = localStorage.getItem('token');
-                let con = await axios.get("http://192.168.102.168:3000/consulta/servicos", { headers: { Authorization: usuario }});
+                let con = await axios.get("http://192.168.102.168:3000/consulta/normal/servicos", { headers: { Authorization: usuario }});
                 this.listServicos = [];
                 if(con.status == 200){
                     this.listServicos = con.data
                 }
+                this.loading = false
+
             } catch (error) {
+                this.loading = false
+
                 if(error.response.status == 401){
                     sessionStorage.clear()
                     this.$router.push('/login')
@@ -162,7 +205,7 @@ export default {
         this.getServico()
         this.getUsuarios()
     },
-    components: { ModalAdd, ModalEdit }
+    components: { ModalAdd, ModalEdit, LoadingView, AlertView}
 
 
 }
@@ -210,7 +253,8 @@ export default {
         </div>
         
     </section>
-    
+    <AlertView v-for="(item, index) in alerts" :key="index" :alert="item"></AlertView>
+    <LoadingView v-if="loading"></LoadingView>
     <ModalAdd
         v-show="isModalVisible"
         @close="closeModal"
@@ -268,10 +312,7 @@ export default {
         <template v-slot:footer>
             <button class="btn btn-color" v-on:click="cadastrarUsuario"> Salvar</button>
         </template>
-       
     </ModalAdd>
-
-
     <ModalEdit
         v-show="isModalEditVisible"
         @close="closeModalEdit"
@@ -303,7 +344,7 @@ export default {
                 </div>
                 <div class="form-row">
                     <div class="form-group" style="width: 30%;" >
-                        <div>Status *</div>
+                        <div>Status</div>
                         <div>
                             <input type="checkbox" id="check-edit-user" v-model="editUsuario.status"> 
                             <label for="check-edit-user"> {{ convertStatus(editUsuario.status) }}</label>

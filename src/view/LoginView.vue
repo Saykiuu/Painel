@@ -1,5 +1,7 @@
 <script>
 import axios from "axios";
+// import AlertView from '@/components/AlertView.vue';
+
 export default {
     data(){
         return {
@@ -27,7 +29,6 @@ export default {
                     }
 
                     localStorage.setItem('perfil', JSON.stringify(temp))
-
                     
                     switch (con.data.type) {
                         case "adm":
@@ -53,6 +54,10 @@ export default {
                 this.message = error.response.data.message
 
             }
+        },
+
+        clear(){
+            this.message = ''
         }
     }
 }
@@ -61,16 +66,16 @@ export default {
 <template>
     <section>
         <form @submit.prevent="save">
-        <div class="center card">
-                <h1>Login</h1>
+        <div class="center">
+                <h1 class="login">Login</h1>
                 <div>
                     <div class="form-group">
                         <label for="">Login</label>
-                        <input type="text" class="form-input" placeholder="Usuário" v-model="login">
+                        <input type="text" class="form-input" v-on:focus="clear" placeholder="Usuário" v-model="login">
                     </div>
                     <div class="form-group">
                         <label for="">Senha</label>
-                        <input type="password" class="form-input" v-model="senha" placeholder="Senha">
+                        <input type="password" class="form-input" v-on:focus="clear" v-model="senha" placeholder="Senha">
                     </div>
 
                 </div>
@@ -87,6 +92,14 @@ export default {
 </template>
 
 <style scoped>
+
+    .login{
+        font-size: 30px;
+    }
+
+    .text-danger{
+        color: rgb(207, 44, 44);
+    }
     section{
         display: flex;
         height: 100vh;
@@ -98,6 +111,9 @@ export default {
         width: 300px;
         height: 300px;
         background-color: white;
+        border: solid 1px #00000020;
+        border-radius: 21px;
+        box-shadow: 0 0 5px #00000020;
         padding: 7px;
         display: flex;
         flex-direction: column;

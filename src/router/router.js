@@ -1,5 +1,5 @@
 
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHashHistory  } from "vue-router";
 import LoginViewVue from "@/view/LoginView.vue";
 import painelVuewVue from "@/view/painelVuew.vue";
 import AtenViewVue from "@/view/AtenView.vue";
@@ -11,7 +11,7 @@ import TriagemViewVue from "@/view/TriagemView.vue";
 import StyleViewVue from "@/view/StyleView.vue";
 
 const routes = [
-    {path: '/', redirect: 'login'},
+    {path: '', redirect: 'login'},
     {path: '/login', name: 'login', component: LoginViewVue},
     {path: '/painel', name: 'painel', component: painelVuewVue},
     {path: '/triagem', name: 'triagem', component: TriagemViewVue},
@@ -21,19 +21,18 @@ const routes = [
         name: 'admin', 
         component: AdmViewVue,
         children: [
-            { path: '', redirect: 'adm/usuarios'},
+            { path: '/', redirect: 'adm/usuarios'},
             { path: 'usuarios', component: UsuariosViewVue},
             { path: 'servicos', component: ServicosViewVue},
             { path: 'style', component: StyleViewVue}
-
         ]
-
     },
-    {path: '/:pathMatch(.*)*', component: NotFound}
+    { path: '/404', component: NotFound}
 ]
 const router = createRouter({
-    history: createWebHistory(),
-    routes
+    history: createWebHashHistory(''),
+    routes,
+
 });
 
 export default router

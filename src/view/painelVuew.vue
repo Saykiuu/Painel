@@ -1,5 +1,5 @@
 <script>
-    import socket, { state } from "@/socket"
+    import { io } from "socket.io-client";
     import axios from "axios"
     export default {
         data(){
@@ -24,6 +24,8 @@
                     guiche: ""
                 },
 
+                socketInstance: undefined,
+
                 hours: '00',
                 minutes: '00',
                 seconds: '00',
@@ -37,27 +39,8 @@
         },
         
         methods: {
-            getHistoric(){
-                let t = JSON.parse(JSON.stringify( state.senhasAtendidas))
-                let d = JSON.parse(JSON.stringify( state.senhasChamadas))
-                d.pop()
-                this.listHistóric = t.concat(d)
-                return this.listHistóric.reverse();
-            },
-            
-            getSelected(){
-                let pass = state.senhasChamadas[state.senhasChamadas.length -1];
-                if(pass != undefined ){
-                    if(pass.senha != this.selectedSenha.senha){
-                        let sound = new Audio(require('@/assets/alert/infobleep.wav'))
-                        sound.play()
-                    }
-                    this.selectedSenha = pass
-                    return this.selectedSenha
-                }else{
-                    return undefined
-                }
-            },
+           
+          
 
             formatConteudo(youtube){
                 let str = ''
@@ -74,16 +57,15 @@
                 try {
                     let con = await axios.get("http://192.168.102.168:3000/consulta/configs");
                     if(con.status == 200){
-                        console.log(con)
                         con.data.forEach(element => {
                             this.mensagem = element.mensagem,
-                            this.som = element.son
+                            this.som = element.son, 
                             this.conteudo = element.conteudo,
                             this.tipo = element.tipo_conteudo
                         });
                     }
                 } catch (error) {
-                    if(error.response.status == 401){
+                    if(error.response?.status == 401){
                         sessionStorage.clear()
                         this.$router.push('/login')
                     }
@@ -102,30 +84,54 @@
                 this.minutes = minutes;
                 this.seconds = seconds;
             },
+
+            connectar(){
+                this.socketInstance = io('http://192.168.102.168:3000');
+                this.socketInstance.on('listar senhas', (data)=>{
+                    this.listHistóric = [];
+                    let temp = JSON.parse(JSON.stringify( data.senhasChamadas))
+                    if(temp.length > 0){
+                        temp.pop()
+                    }
+                    this.listHistóric = temp.concat(data.senhasAtendidas)
+                    this.selectedSenha = data.senhasChamadas[data.senhasChamadas.length -1];
+                });
+                this.socketInstance.on('alert',(data)=>{
+                    console.log('data: ',data)
+                    this.playSong()
+                })
+            },
+            playSong(){
+                this.$refs.myaudio.play().catch((e)=>{
+                    console.log(e);
+                })
+            }
         },
 
+
+
         created(){
-            socket.listemSenha();
             this.getConfigs()
+            this.connectar()
         },
         
         mounted(){
             setInterval(() => {
                 this.setTime()
-            }, 1000),
-
-            this.getSelected()
+            }, 1000)
         }
     }
 </script>
 
 <template>
+    
+
     <section class="esquerda">
         <iframe :src="`https://www.youtube.com/embed/${formatConteudo(conteudo)}?&autoplay=1&controls=0`" frameborder="0" v-if="tipo=='video'"></iframe>
         <img :src="`${conteudo}`" v-else>
         
         <div class="content-history">
-            <div class="ult-senha" v-for="(item, index) in getHistoric()" :key="index">
+            <div class="ult-senha" v-for="(item, index) in listHistóric" :key="index">
                 <span class="senha">
                     {{item.senha}}
                 </span>
@@ -141,7 +147,8 @@
     </section>
 
     <section class="direita">
-        <div class="content-body" v-if="getSelected() !=undefined">
+        
+        <div class="content-body" v-if="selectedSenha != undefined">
             <div class="content-tipo">
                 {{ selectedSenha.tipo}}
             </div>
@@ -176,6 +183,10 @@
 
     <section class="baixo">
         <p>{{ mensagem }}</p>
+        <p><audio id="myaudio" ref="myaudio"   >
+            <source src="./../assets/alert/ding-dong.wav">
+        </audio></p>
+        
     </section>
 
 </template>
@@ -241,17 +252,17 @@
     width: 70vw;
     left: 0;
     top: 0;
-    bottom: 70px;
+    bottom: 50px;
     overflow-x: hidden;
     overflow-y: hidden;
    }
    .content-history{
     width: 100%;
+    box-shadow: 0 -5px 10px #000;
     display: flex;
     height: 25%;
     transform: translateY(-10px);
     background-color:var(--color-main);
-
    }
    .ult-senha{
     min-width:calc(100%/4);
@@ -283,7 +294,7 @@
     position: absolute;
     right: 0;
     top:0;
-    bottom:70px;
+    bottom: 50px;
     background-color: var(--color-main);
     width: 30%;
     display: flex;
@@ -296,8 +307,8 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background-color: var(--color-main);
-    height: 70px;
+    background-color: #277fb9;
+    height: 50px;
     color:#fff;
     text-align: center;
     border-top: 1px #fff solid;
@@ -305,7 +316,7 @@
    }
 
    .baixo p{
-    font-size: 40px;
+    font-size: 30px;
    }
 
 </style>

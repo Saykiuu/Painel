@@ -2,6 +2,7 @@
 
 import ModalAdd from '@/components/ModalAdd.vue';
 import ModalEdit from '@/components/ModalEdit.vue';
+import LoadingView from '@/components/LoadingView.vue';
 
 import axios from 'axios'
 export default {
@@ -22,8 +23,10 @@ export default {
             listServicos: [{
                 id: 0,
                 description: '',
-                status: false
-            }]
+                status: false,
+                departamento: ''
+            }],
+            loading: false
         }
     },
     methods: {
@@ -46,7 +49,6 @@ export default {
             this.servicoEdit = { description: '', guiche: '', status : true}
             this.isModalEditVisible = false
         },
-        
 
         convertStatus(val){
             if(val) return "Ativo";
@@ -56,13 +58,17 @@ export default {
         async getServico(){
             try {
                 let usuario = localStorage.getItem('token');
+                this.loading = true
                 let con = await axios.get("http://192.168.102.168:3000/consulta/servicos", { headers: { Authorization: usuario }});
                 this.listServicos = [];
                 if(con.status == 200){
                     this.listServicos = con.data
                 }
+                this.loading = false
 
             } catch (error) {
+                this.loading = false
+
                 if(error.response.status == 401){
                     sessionStorage.clear()
                     this.$router.push('/login')
@@ -72,14 +78,16 @@ export default {
 
         async editarUsuario(){
             try {
+                this.loading = true
                 let usuario = localStorage.getItem('token');
                 let con = await axios.post("http://192.168.102.168:3000/atualizar/servico", this.editServico , { headers: { Authorization: usuario }});
                 if(con.status == 200){
                     this.getServico()        
                     this.closeModalEdit()        
                 }
+                this.loading = false
             } catch (error) {
-                console.log(error)
+                this.loading = false
                 if(error.response?.status == 401){
                     localStorage.clear()
                     this.$router.push('/login')
@@ -89,14 +97,16 @@ export default {
 
         async cadastrarServico(){
             try {
+                this.loading = true
                 let usuario = localStorage.getItem('token');
                 let con = await axios.post("http://192.168.102.168:3000/cadastrar/servico", this.servico , { headers: { Authorization: usuario }});
                 if(con.status == 200){
                     this.getServico()        
                     this.closeModal()        
                 }
+                this.loading = false
             } catch (error) {
-                console.log(error)
+                this.loading = false
                 if(error.response?.status == 401){
                     sessionStorage.clear()
                     this.$router.push('/login')
@@ -105,7 +115,7 @@ export default {
         }
 
     },
-    components: { ModalAdd, ModalEdit},
+    components: { ModalAdd, ModalEdit, LoadingView},
 
     created(){
         this.getServico()
@@ -163,6 +173,7 @@ export default {
         </template>
     </ModalAdd>
 
+    
     <ModalEdit
         v-show="isModalEditVisible"
         @close="closeModalEdit"
@@ -192,7 +203,7 @@ export default {
 
        
     </ModalEdit>
-
+    <LoadingView v-if="loading"></LoadingView>
 </template>
 
 <style scoped>

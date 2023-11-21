@@ -1,5 +1,6 @@
 <script>
 import SideNav from '@/components/SideNav.vue';
+
 export default {
     data(){
         return {
@@ -22,6 +23,7 @@ export default {
     <section>
         <SideNav :usuario="usuario" ></SideNav>
         <RouterView></RouterView>
+        
     </section>
     
     
